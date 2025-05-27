@@ -1,0 +1,1104 @@
+---
+title: "NYC CitiBike System_EDA"
+author: "S/17/811"
+date: "2023-08-08"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+***Exploratory Data Analysis***
+
+```{r}
+#import libraries
+
+library(tidyverse)
+library(lubridate)#'lubridate' package is used for working with dates and times in R
+library(skimr)
+library(tmap)#'tmap' package for creating thematic maps in R
+library(sf)#'sf'(simple features) package is used for working with geospatial data in R
+
+```
+
+```{r}
+#download data from "https://citibikenyc.com/system-data"
+
+#import data
+
+trip_data <- read_csv(file = "../data/trips_data_2022.csv",col_types =   c("cfTTcfcfddddf"))
+
+head(trip_data)
+```
+
+```{r}
+# explore the structure of the data set
+
+trip_data %>% str()
+```
+
+```{r}
+#summary statistic
+
+trip_data %>% skim()
+```
+
+```{r}
+#check missing values
+
+#missmap(trip_data)
+sum(is.na(trip_data))
+```
+
+
+```{r}
+# filter observations which has the missing values
+
+trip_data %>%
+  filter(!complete.cases(.))
+```
+
+```{r}
+# drop missing values
+
+trip_data <- trip_data%>%drop_na()
+```
+
+
+```{r}
+#Check duplicate rows
+
+trip_data[duplicated(trip_data),]
+```
+
+```{r}
+# split started_at and ended_at variables into two separate variables
+
+trip_data <- trip_data %>%
+  mutate(start_time = format(started_at, format = "%H:%M:%S"),
+         start_date = as.Date(started_at),
+         end_time = format(ended_at, format = "%H:%M:%S"),
+         end_date = as.Date(ended_at)
+  )
+```
+
+
+```{r}
+#frequency distribution for categorical variables 'rideble_type', 'start_station_id', 'end_station_id', and 'member_casual'
+
+frequency_ridebleType <- trip_data %>%
+  group_by(rideable_type)%>%
+  summarise(trips = n())%>%
+  arrange(desc(trips))
+
+frequency_ridebleType
+
+
+frequency_startStation <- trip_data %>%
+  group_by(start_station_id)%>%
+  summarise(trips = n())%>%
+  arrange(desc(trips))
+
+frequency_startStation
+
+
+frequency_endStation <- trip_data %>%
+  group_by(end_station_id)%>%
+  summarise(trips = n())%>%
+  arrange(desc(trips))
+
+frequency_endStation
+
+
+frequency_member <- trip_data %>%
+  group_by(member_casual)%>%
+  summarise(trips = n())%>%
+  arrange(desc(trips))
+
+frequency_member
+```
+
+```{r}
+# 'docked_bike' rideable type
+trip_data %>% 
+  filter(rideable_type == "docked_bike")
+```
+
+```{r}
+frequency_docked_bike <- trip_data %>% 
+  filter(rideable_type == "docked_bike")%>%
+  group_by(start_station_id)%>%
+  summarise(trips = n())%>%
+  arrange(desc(trips))
+
+frequency_docked_bike
+```
+
+```{r}
+# remove observations where the rideable_type is 'docked_bike'
+
+trip_data <- trip_data %>%
+  filter(rideable_type != 'docked_bike')
+```
+
+
+```{r}
+#Plot a bar chart of rideable types
+trip_data %>%
+  ggplot(aes(x = rideable_type)) +
+  geom_bar()+
+  labs(x = "Rideable Type", y="Trips",title = "Distribution of Rideable Type")+
+  theme_classic()
+```
+
+```{r}
+# distribution of trip counts for different 'rideable' types at each start station
+
+trip_data %>%
+  ggplot(mapping = aes(x=start_station_id))+
+  geom_bar(aes(fill = rideable_type)) +
+  xlab("start station") +
+  ylab("trip count")
+```
+
+```{r}
+# distribution of start stations
+
+trip_data %>%
+  ggplot(aes(x = start_station_id)) +
+  geom_bar()+
+  labs(x="Start Station ID",y="Trips",title = "Distribution of Start Station")+
+  theme_classic()
+```
+
+
+```{r}
+# distribution of end station
+trip_data %>%
+  ggplot(aes(x = end_station_id)) +
+  geom_bar()+
+  labs(x="End Station ID",y="Trips",title = "Distribution of End Station")+
+  theme_classic()
+```
+
+
+```{r}
+# User Behavior Patterns
+
+# Identify top start and end stations for both member and casual users
+
+top_start_stations_member <- trip_data %>%
+  filter(member_casual == "member") %>%
+  group_by(start_station_id) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  head(5)
+
+top_start_stations_member
+
+top_start_stations_casual <- trip_data %>%
+  filter(member_casual == "casual") %>%
+  group_by(start_station_id) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  head(5)
+
+top_start_stations_casual
+
+top_end_stations_member <- trip_data %>%
+  filter(member_casual == "member") %>%
+  group_by(end_station_id) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  head(5)
+
+top_end_stations_member
+
+top_end_stations_casual <- trip_data %>%
+  filter(member_casual == "casual") %>%
+  group_by(end_station_id) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  head(5)
+
+top_end_stations_casual
+```
+
+
+Working with date and time distributions
+
+```{r}
+#distribution of number of trips by month 
+
+# Extract month from start_date
+#trip_data$month <- format(trip_data$start_date, "%B")
+
+# Count the number of trips per month
+#trip_counts <- trip_data %>%
+#  group_by(month) %>%
+#  summarise(total_trips = n())
+
+# Create a bar plot of the number of trips by month
+#ggplot(trip_counts, aes(x = month, y = total_trips)) +
+#  geom_bar(stat = "identity") +
+#  xlab("Month") +
+#  ylab("Number of Trips") +
+#  ggtitle("Distribution of Number of Trips by Month")+
+#  theme_classic()
+```
+
+
+```{r}
+# distribution of number of trips by day of the week
+
+# Extract day of the week from start_date
+trip_data$day_of_week <- weekdays(trip_data$start_date)
+
+# Count the number of trips per day of the week
+trip_counts <- trip_data %>%
+  group_by(day_of_week) %>%
+  summarise(total_trips = n())%>%
+  arrange(desc(total_trips))  # Sort the data in descending order
+
+# Reorder the levels of day_of_week based on total_trips
+trip_counts$day_of_week <- factor(trip_counts$day_of_week, levels = trip_counts$day_of_week)
+
+# Create a bar plot of the number of trips by day of the week
+ggplot(trip_counts, aes(x = day_of_week, y = total_trips)) +
+  geom_bar(stat = "identity") +
+  xlab("Day of the Week") +
+  ylab("Number of Trips") +
+  ggtitle("Distribution of Number of Trips by Day of the Week")+
+  theme_classic()
+```
+
+
+```{r}
+# distribution of number of trips by day
+
+
+# Extract day from start_date
+#trip_data$day <- format(trip_data$start_date, "%d")
+
+# Count the number of trips per day
+#trip_counts <- trip_data %>%
+#  group_by(day) %>%
+#  summarise(total_trips = n())
+
+# Create a bar plot of the number of trips by day
+#ggplot(trip_counts, aes(x = day, y = total_trips)) +
+#  geom_bar(stat = "identity") +
+#  xlab("Day") +
+#  ylab("Number of Trips") +
+#  ggtitle("Distribution of Number of Trips by Day")+
+#  theme_classic()
+```
+
+
+```{r}
+# distribution of number of trips by hour
+
+# Extract hour from start_time
+trip_data$hour <- as.integer(substr(trip_data$start_time, 1, 2))
+
+# Filter data for weekdays and weekends
+weekday_trip_counts <- trip_data %>%
+  filter(weekdays(start_date) %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")) %>%
+  group_by(hour) %>%
+  summarise(total_trips = n())
+
+weekend_trip_counts <- trip_data %>%
+  filter(weekdays(start_date) %in% c("Saturday", "Sunday")) %>%
+  group_by(hour) %>%
+  summarise(total_trips = n())
+
+# Create separate bar plots for weekdays and weekends
+weekday_plot <- ggplot(weekday_trip_counts, aes(x = hour, y = total_trips)) +
+  geom_bar(stat = "identity") +
+  xlab("Hour") +
+  ylab("Number of Trips") +
+  ggtitle("Distribution of Number of Trips by Hour (Weekdays)") +
+  theme_classic()
+
+weekend_plot <- ggplot(weekend_trip_counts, aes(x = hour, y = total_trips)) +
+  geom_bar(stat = "identity") +
+  xlab("Hour") +
+  ylab("Number of Trips") +
+  ggtitle("Distribution of Number of Trips by Hour (Weekends)") +
+  theme_classic()
+
+# Display the plots
+weekday_plot
+weekend_plot
+
+```
+
+The weekdays plot provides insight into the distribution of the number of trips by hour on weekdays (Monday to Friday). Each bar on the x-axis represents a specific hour of the day, while the y-axis represents the count of trips recorded during each hour. By examining the heights of the bars, we can observe that the hours 8 AM, 3 PM, 4 PM, 5 PM, and 6 PM have the highest number of trips, indicating that these hours are the peak hours for weekday travel.
+
+On the other hand, the weekends plot illustrates the distribution of the number of trips by hour on weekends (Saturday and Sunday). It follows a similar structure to the weekdays plot.By analyzing this plot, we can identify the hours 12 PM, 1 PM, 2 PM, 3 PM, 4 PM, and 5 PM as the peak hours for weekend travel.
+
+Furthermore, we can observe that the count of trips during weekdays generally falls within the range of 0 to 700, whereas the count of trips during weekends tends to be lower, typically ranging from 0 to 225. This indicates that there are more trips recorded on weekdays compared to weekends.
+
+
+
+```{r}
+# Create box plots for the distribution of trips by hour, separated by weekdays and weekends
+
+# Extract hour from start_time
+
+trip_data$hour <- as.integer(substr(trip_data$start_time, 1, 2))
+
+# Group the data by hour and count the number of trips
+
+hourly_trip_counts <- trip_data %>%
+  group_by(start_date,hour)%>%
+  summarise(trip_count = n())
+
+# Filter for weekdays(Monday to Friday)
+
+weekday_trip_counts <- hourly_trip_counts%>% 
+filter(weekdays(start_date) %in% c("Monday","Tuesday","Wednesday","Thursday","Friday"))
+
+# Filter for weekend days (Saturday and Sunday)
+
+weekend_trip_counts <- hourly_trip_counts%>%
+  filter(weekdays(start_date) %in% c("Saturday","Sunday"))
+
+# Create box plots for weekdays
+ggplot(weekday_trip_counts, aes(x = factor(hour), y = trip_count)) +
+  geom_boxplot() +
+  xlab("Hour of the Day") +
+  ylab("Number of Trips") +
+  ggtitle("Box Plot of Weekday Trip Counts by Hour") +
+  theme_minimal() +
+  scale_x_discrete(breaks = 0:23)
+
+# Create box plots for weekend days
+ggplot(weekend_trip_counts, aes(x = factor(hour), y = trip_count)) +
+  geom_boxplot() +
+  xlab("Hour of the Day") +
+  ylab("Number of Trips") +
+  ggtitle("Box Plot of Weekend Trip Counts by Hour") +
+  theme_minimal() +
+  scale_x_discrete(breaks = 0:23)
+
+```
+
+
+```{r}
+# Create box plots for the distribution of trips by hour, separated by weekdays and weekends for user type(member_casual)
+
+# Extract hour from start_time
+
+trip_data$hour <- as.integer(substr(trip_data$start_time, 1, 2))
+
+# Group the data by hour user type('member_casual') count the number of trips
+
+hourly_trip_counts <- trip_data %>%
+  group_by(start_date,hour,member_casual)%>%
+  summarise(trip_count = n())
+
+# Filter for weekdays(Monday to Friday)
+
+weekday_trip_counts <- hourly_trip_counts%>% 
+filter(weekdays(start_date) %in% c("Monday","Tuesday","Wednesday","Thursday","Friday"))
+
+# Filter for weekend days (Saturday and Sunday)
+
+weekend_trip_counts <- hourly_trip_counts%>%
+  filter(weekdays(start_date) %in% c("Saturday","Sunday"))
+
+# Create box plots for weekdays, separated by user type
+
+ggplot(weekday_trip_counts, aes(x = factor(hour), y = trip_count)) +
+  geom_boxplot() +
+  xlab("Hour of the Day") +
+  ylab("Number of Trips") +
+  ggtitle("Box Plot of Weekday Trip Counts by Hour") +
+  theme_minimal() +
+  scale_x_discrete(breaks = 0:23)+
+  facet_wrap(~member_casual,scales = "free_y")
+
+# Create box plots for weekend days, separated by user type
+
+ggplot(weekend_trip_counts, aes(x = factor(hour), y = trip_count)) +
+  geom_boxplot() +
+  xlab("Hour of the Day") +
+  ylab("Number of Trips") +
+  ggtitle("Box Plot of Weekend Trip Counts by Hour") +
+  theme_minimal() +
+  scale_x_discrete(breaks = 0:23)+
+  facet_wrap(~member_casual, scales = "free_y")
+```
+
+
+```{r}
+# Create box plots for the distribution of trips by hour, separated by weekdays and weekends for bike type (classic_electric)
+
+# Extract hour from start_time
+
+trip_data$hour <- as.integer(substr(trip_data$start_time, 1, 2))
+
+# Group the data by hour bike type('classic_electric') count the number of trips
+
+hourly_trip_counts <- trip_data %>%
+  group_by(start_date,hour,rideable_type)%>%
+  summarise(trip_count = n())
+
+# Filter for weekdays(Monday to Friday)
+
+weekday_trip_counts <- hourly_trip_counts%>% 
+filter(weekdays(start_date) %in% c("Monday","Tuesday","Wednesday","Thursday","Friday"))
+
+# Filter for weekend days (Saturday and Sunday)
+
+weekend_trip_counts <- hourly_trip_counts%>%
+  filter(weekdays(start_date) %in% c("Saturday","Sunday"))
+
+# Create box plots for weekdays, separated by bike type
+
+ggplot(weekday_trip_counts, aes(x = factor(hour), y = trip_count)) +
+  geom_boxplot() +
+  xlab("Hour of the Day") +
+  ylab("Number of Trips") +
+  ggtitle("Box Plot of Weekday Trip Counts by Hour") +
+  theme_minimal() +
+  scale_x_discrete(breaks = 0:23)+
+  facet_wrap(~rideable_type,scales = "free_y")
+
+# Create box plots for weekend days, separated by bike type
+
+ggplot(weekend_trip_counts, aes(x = factor(hour), y = trip_count)) +
+  geom_boxplot() +
+  xlab("Hour of the Day") +
+  ylab("Number of Trips") +
+  ggtitle("Box Plot of Weekend Trip Counts by Hour") +
+  theme_minimal() +
+  scale_x_discrete(breaks = 0:23)+
+  facet_wrap(~rideable_type, scales = "free_y")
+```
+
+
+```{r}
+#Average, Maximum and Minimum Trip Duration
+
+# Calculate trip duration and add as a new variable 'trip_duration' 
+
+trip_data <- trip_data %>%
+  mutate(trip_duration = difftime(ended_at, started_at, units = "mins"))
+
+trip_data %>%
+  summarise(maximum_trip_duration = max(trip_duration),
+            minimum_trip_duration = min(trip_duration),
+            average_trip_duration = mean(trip_duration))
+```
+
+```{r}
+trip_data %>%
+  filter(trip_duration == min(trip_duration) | trip_duration == max(trip_duration))
+```
+
+
+```{r}
+#Convert trip_duration to numeric
+
+trip_data$trip_duration <- as.numeric(as.character(trip_data$trip_duration))
+```
+
+
+
+```{r}
+# Histogram of trip duration 
+trip_data %>%
+  ggplot(aes(x=trip_duration))+
+  geom_histogram(binwidth = 5)+
+  labs(title = "Histogram of Trip Durations",
+       x = "Trip Duration (minutes)",
+       y = "frequency")+
+  theme_classic()
+```
+
+
+```{r}
+# Create bins for trip duration and count the number of trips in each bin
+
+trip_data %>%
+  filter(trip_duration >= 0)%>%
+  mutate(trip_duration_bin = cut(trip_duration,seq(0,max(trip_duration)+5,by =5),include.lowest = TRUE),right = FALSE)%>%
+  group_by(trip_duration_bin)%>%
+  summarise(num_trips = n())%>%
+  arrange(trip_duration_bin)
+```
+
+
+```{r}
+trip_data %>%
+  filter(trip_duration >= 0)%>%
+  mutate(trip_duration_bin = cut(trip_duration,seq(0,max(trip_duration)+5,by =5),include.lowest = TRUE),right = FALSE)%>%
+  group_by(trip_duration_bin)%>%
+  summarise(num_trips = n())%>%
+  ggplot(aes(x = trip_duration_bin, y = num_trips))+
+  geom_bar(stat = "identity")+
+  labs(title = "Histogram of Trip Durations",
+       x = "Trip Duration Bin",
+       y = "Number of Trips")+
+  theme_minimal()
+```
+
+
+
+```{r}
+trip_data %>%
+  ggplot(aes(x=" ",y=trip_duration))+
+  geom_boxplot()+
+  labs(title = "Box Plot of Trip Duration",y="Trip Duration (minutes)")+
+  theme_minimal()
+```
+
+
+```{r}
+# trip duration based on different users
+
+user_type_summary <- trip_data %>%
+  group_by(member_casual) %>%
+  summarise(total_rentals = n(), 
+            avg_trip_duration = mean(trip_duration),
+            max_duration = max(trip_duration),
+            min_duration = min(trip_duration))
+
+user_type_summary
+```
+
+
+```{r}
+# trip duration based on different bike types
+
+bike_type_summary <- trip_data %>%
+  group_by(rideable_type) %>%
+  summarise(total_rentals = n(), 
+            avg_trip_duration = mean(trip_duration),
+            max_duration = max(trip_duration),
+            min_duration = min(trip_duration))
+
+bike_type_summary
+```
+
+
+```{r}
+trip_data %>% filter(trip_duration <= 1)
+```
+
+
+```{r}
+trip_data <- trip_data %>%
+  filter(trip_duration > 1)
+```
+
+
+```{r}
+
+# Filter unique start_stations
+start_stations <- trip_data %>%
+  distinct(start_station_id, .keep_all = TRUE) %>%
+  select(start_station_id,start_lat,start_lng) %>%
+  rename('station_id' = 'start_station_id',
+         'lat' = 'start_lat',
+         'lng' = 'start_lng')
+                 
+# Filter unique end_stations
+end_stations <- trip_data %>%
+  distinct(end_station_id, .keep_all = TRUE) %>%
+  select(end_station_id,end_lat,end_lng)%>%
+  rename('station_id' = 'end_station_id',
+         'lat' = 'end_lat',
+         'lng' = 'end_lng')
+
+
+#start_stations
+#end_stations
+
+stations <- bind_rows(start_stations,end_stations)
+
+
+# Remove duplicate rows based on all columns
+stations_data <- distinct(stations, .keep_all = TRUE)
+#stations_data
+
+# Export the station data as a .csv file
+write_csv(station_data,"../data/stations_data.csv")
+
+```
+
+
+
+```{r}
+
+trips_data <- trip_data
+
+write_csv(tripsData,"../data/trips_data.csv")
+
+```
+
+
+
+
+1.What are the most common destination of the trip starting from each station?
+
+```{r}
+# Group by start_station_id and end_station_id, and summarize the number of trips 
+
+common_destinations <- trip_data %>%
+  group_by(start_station_id,end_station_id) %>%
+  summarise(number_of_trips = n()) %>%
+  arrange(desc(number_of_trips)) %>%
+  group_by(start_station_id) %>%
+  slice(1) #select the most common destination for each start station
+
+# Arrange the result in decreasing order of the number of trips 
+
+common_destinations <- common_destinations %>%
+  arrange(desc(number_of_trips))
+
+common_destinations
+```
+
+
+
+2. Does it change with the time ?
+
+```{r}
+# Group by hour, start_station_id, and end_station_id and summarize the trip
+
+destinations_by_hour <- trip_data %>%
+  group_by(hour,start_station_id,end_station_id) %>%
+  summarise(number_of_trips = n(),.groups = 'drop') %>%
+  arrange(desc(number_of_trips)) %>%
+  group_by(start_station_id,hour) %>%
+  slice(1) # select the most common destination for each start station at each hour
+
+destinations_by_hour
+```
+
+3. Does it change with user type ?
+
+```{r}
+# Separate tables for member and casual users
+
+destinations_member <- trip_data %>% 
+  filter(member_casual == "member") %>%
+  group_by(start_station_id,end_station_id) %>%
+  summarise(number_of_trips = n()) %>%
+  arrange(desc(number_of_trips)) %>%
+  group_by(start_station_id) %>%
+  slice(1) # select the most common destination for each start station and user type 
+
+# Arrange the result in decreasing order of the number of trips 
+destinations_member <- destinations_member %>%
+  arrange(desc(number_of_trips))
+
+destinations_member
+
+```
+
+```{r}
+destinations_casual <- trip_data %>% 
+  filter(member_casual == "casual") %>%
+  group_by(start_station_id,end_station_id) %>%
+  summarise(number_of_trips = n()) %>%
+  arrange(desc(number_of_trips)) %>%
+  group_by(start_station_id) %>%
+  slice(1) #
+
+# Arrange the result in decreasing order of the number of trips 
+destinations_casual <- destinations_casual %>%
+  arrange(desc(number_of_trips))
+
+destinations_casual
+```
+
+
+
+4. Does it change with day of the week ?
+
+```{r}
+# Group by day_of_week, start_station_id, and end_station_name, and summarize the number of trips
+destinations_by_day <- trip_data %>%
+  group_by(day_of_week, start_station_id, end_station_id) %>%
+  summarise(number_of_trips = n()) %>%
+  arrange(desc(number_of_trips)) %>%
+  group_by(start_station_id,day_of_week) %>%
+  slice(1)  # Select the most common destination for each start station on each day
+
+# View the result
+destinations_by_day
+```
+
+
+```{r}
+# Separate tables for days of week 
+
+# Group by start_station_id, and end_station_name, and summarize the number of trips
+destinations_Monday <- trip_data %>% 
+  filter(day_of_week == "Monday") %>%
+  group_by(start_station_id,end_station_id) %>%
+  summarise(number_of_trips = n()) %>%
+  arrange(desc(number_of_trips)) %>%
+  group_by(start_station_id) %>%
+  slice(1) # select the most common destination for each start station and day of week
+
+
+# Arrange the result in decreasing order of the number of trips 
+destinations_Monday <- destinations_Monday %>%
+  arrange(desc(number_of_trips))
+
+destinations_Monday
+```
+
+
+
+
+```{r}
+destinations_Tuesday <- trip_data %>% 
+  filter(day_of_week == "Tuesday") %>%
+  group_by(start_station_id,end_station_id) %>%
+  summarise(number_of_trips = n()) %>%
+  arrange(desc(number_of_trips)) %>%
+  group_by(start_station_id) %>%
+  slice(1) # select the most common destination for each start station and day of week
+
+# Arrange the result in decreasing order of the number of trips 
+destinations_Tuesday <- destinations_Tuesday %>%
+  arrange(desc(number_of_trips))
+
+destinations_Tuesday
+```
+
+
+
+```{r}
+destinations_Wednesday <- trip_data %>% 
+  filter(day_of_week == "Wednesday") %>%
+  group_by(start_station_id,end_station_id) %>%
+  summarise(number_of_trips = n()) %>%
+  arrange(desc(number_of_trips)) %>%
+  group_by(start_station_id) %>%
+  slice(1) # select the most common destination for each start station and day of week
+
+# Arrange the result in decreasing order of the number of trips 
+destinations_Wednesday <- destinations_Wednesday %>%
+  arrange(desc(number_of_trips))
+
+destinations_Wednesday
+```
+
+
+
+```{r}
+destinations_Thursday <- trip_data %>% 
+  filter(day_of_week == "Thursday") %>%
+  group_by(start_station_id,end_station_id) %>%
+  summarise(number_of_trips = n()) %>%
+  arrange(desc(number_of_trips)) %>%
+  group_by(start_station_id) %>%
+  slice(1) # select the most common destination for each start station and day of week
+
+# Arrange the result in decreasing order of the number of trips 
+destinations_Thursday <- destinations_Thursday %>%
+  arrange(desc(number_of_trips))
+
+destinations_Thursday
+```
+
+
+
+```{r}
+destinations_Friday <- trip_data %>% 
+  filter(day_of_week == "Friday") %>%
+  group_by(start_station_id,end_station_id) %>%
+  summarise(number_of_trips = n()) %>%
+  arrange(desc(number_of_trips)) %>%
+  group_by(start_station_id) %>%
+  slice(1) # select the most common destination for each start station and day of week
+
+# Arrange the result in decreasing order of the number of trips 
+destinations_Friday <- destinations_Friday %>%
+  arrange(desc(number_of_trips))
+
+destinations_Friday
+```
+
+
+```{r}
+destinations_Saturday <- trip_data %>% 
+  filter(day_of_week == "Saturday") %>%
+  group_by(start_station_id,end_station_id) %>%
+  summarise(number_of_trips = n()) %>%
+  arrange(desc(number_of_trips)) %>%
+  group_by(start_station_id) %>%
+  slice(1) # select the most common destination for each start station and day of week
+
+# Arrange the result in decreasing order of the number of trips 
+destinations_Saturday <- destinations_Saturday %>%
+  arrange(desc(number_of_trips))
+
+destinations_Saturday
+```
+
+
+
+```{r}
+destinations_Sunday <- trip_data %>% 
+  filter(day_of_week == "Sunday") %>%
+  group_by(start_station_id,end_station_id) %>%
+  summarise(number_of_trips = n()) %>%
+  arrange(desc(number_of_trips)) %>%
+  group_by(start_station_id) %>%
+  slice(1) # select the most common destination for each start station and day of week
+
+# Arrange the result in decreasing order of the number of trips 
+destinations_Sunday <- destinations_Sunday %>%
+  arrange(desc(number_of_trips))
+
+destinations_Sunday
+```
+
+
+
+
+For station 5905.14, the most common destination is also 5905.14, with 118 trips.
+
+No trips start from station 5905.14 at hours 3, 4, 5, 6. At hours 0, 1, 7, 10, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, the most common destination is also 5905.14. At hours 2, 11, and 20, the most common destination is 5980.07. At hour 8, the most common destination is 6441.01 with 4 trips. At hour 9, the most common destination is 5500.02 with 1 trip. Therefore, for station 5905.14, the most common destination changes with the hour of the day.
+
+The most common destination does not change for station 5905.14 with user type. Both member and casual users’ most common destination is also 5905.14.
+
+On all days, the most common destination for station 5905.14 is also 5905.14.
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+```{r}
+tmap_mode("view")
+```
+
+
+
+```{r}
+#Number of Trips by Start Station in NYC
+
+
+# Load a shape file of New York City
+
+ nyc_shape <- st_read('../data/BoroughBoundaries.geojson')
+ 
+ # Convert the data set to an 'sf' object
+ bike_trips_sf <- st_as_sf(trip_data, coords = c("start_lng", "start_lat"))
+ 
+ # Group data by start station and count the number of trips
+ start_station_counts <- bike_trips_sf %>%
+   group_by(start_station_id) %>%
+   summarise(num_trips = n(), .groups = 'drop')
+ 
+ # Create a map of start stations on top of NYC shape file
+ start_station_map <-tm_shape(nyc_shape) +
+   tm_borders(lwd = 1, col = "black") +  # Add borders to NYC areas
+   tm_shape(start_station_counts) +
+   tm_bubbles(size = 0.05, col = 'num_trips', palette = "viridis",border.col = "black") +
+   tm_layout(title = 'Number of Trips by Start Station in NYC') +
+   tm_basemap(server = "OpenStreetMap",alpha = 0.5)
+ 
+ start_station_map
+ 
+ tmap_save(tm=start_station_map,
+         filename ="../output/start_station_map.png")
+
+```
+
+
+
+```{r}
+# Load a shape file of New York City
+ nyc_shape <- st_read('../data/BoroughBoundaries.geojson')
+ 
+ # Filter the shape file to only include Manhattan
+ Manhattan_shape <- nyc_shape %>%
+   filter(boro_name == 'Manhattan')
+ 
+ bike_trips_sf <- st_set_crs(bike_trips_sf, 4326)
+ 
+ 
+ # Filter the trip data to include only trips that start or end within Manhattan
+ bike_trips_manhattan <- st_intersection(bike_trips_sf, Manhattan_shape)
+ 
+ 
+ # Group data by start station and count the number of trips
+ start_station_counts_manhattan <- bike_trips_manhattan %>%
+   group_by(start_station_id) %>%
+   summarise(num_trips = n(), .groups = 'drop')
+ 
+ # Create a map of start stations within Manhattan
+ start_station_manhattan_map <- tm_shape(Manhattan_shape) +
+   tm_borders(lwd = 1, col = "black") +
+   tm_shape(start_station_counts_manhattan) +
+   tm_bubbles(size = 0.05, col = 'num_trips',palette = "viridis", border.col = 'black') +
+   tm_layout(title = 'Number of Trips by Start Station in Manhattan') +
+   tm_basemap(server = "OpenStreetMap", alpha = 0.5)
+ 
+ start_station_manhattan_map
+ 
+ tmap_save(tm=start_station_manhattan_map,
+         filename ="../output/start_station_manhattan_map.png")
+```
+
+
+
+```{r}
+
+ # Load a shape file of New York City
+ 
+ nyc_shape <- st_read('../data/BoroughBoundaries.geojson')
+ 
+ # Convert the data set to an 'sf' object
+ bike_trips_sf <- st_as_sf(trip_data, coords = c("end_lng", "end_lat"))
+ 
+ # Group data by end station and count the number of trips
+ end_station_counts <- bike_trips_sf %>%
+   group_by(end_station_id) %>%
+   summarise(num_trips = n(), .groups = 'drop')
+ 
+ # Create a map of end stations on top of NYC shapefile
+ end_station_map <- tm_shape(nyc_shape) +
+   tm_borders(lwd = 1, col = "black") +  # Add borders to NYC areas
+   tm_shape(end_station_counts) +
+   tm_bubbles(size = 0.05, col = 'num_trips', palette = "YlGnBu", border.col = 'black') +
+   tm_layout(title = 'Number of Trips by End Station in NYC') +
+   tm_basemap(server = "OpenStreetMap", alpha = 0.5)
+ 
+ end_station_map
+ 
+ tmap_save(tm=end_station_map,
+           filename ="../output/end_station_map.png")
+```
+
+
+
+```{r}
+ # Load a shape file of New York City
+ nyc_shape <- st_read('../data/BoroughBoundaries.geojson')
+ 
+ # Filter the shape file to only include Manhattan
+ Manhattan_shape <- nyc_shape %>%
+   filter(boro_name == 'Manhattan')
+ 
+ bike_trips_sf <- st_set_crs(bike_trips_sf, 4326)
+ 
+ 
+ # Filter the trip data to include only trips that start or end within Manhattan
+ bike_trips_manhattan <- st_intersection(bike_trips_sf, Manhattan_shape)
+ 
+ 
+ # Group data by end station and count the number of trips
+ end_station_counts_manhattan <- bike_trips_manhattan %>%
+   group_by(end_station_id) %>%
+   summarise(num_trips = n(), .groups = 'drop')
+ 
+ # Create a map of end stations within Manhattan
+ end_station_manhattan_map <- tm_shape(Manhattan_shape) +
+   tm_borders(lwd = 1, col = "black") +
+   tm_shape(end_station_counts_manhattan) +
+   tm_bubbles(size = 0.05, col = 'num_trips',palette = "YlGnBu", border.col = 'black') +
+   tm_layout(title = 'Number of Trips by End Station in Manhattan') +
+   tm_basemap(server = "OpenStreetMap", alpha = 0.5)
+ 
+ end_station_manhattan_map
+ 
+ tmap_save(tm = end_station_manhattan_map,
+         filename ="../output/end_station_manhattan_map.png")
+```
+
+
+
+```{r}
+# Load a shape file of New York City
+ nyc_shape <- st_read('../data/BoroughBoundaries.geojson')
+ 
+ # Filter the shape file to only include Manhattan
+ Manhattan_shape <- nyc_shape %>%
+   filter(boro_name == 'Manhattan')
+ 
+ bike_trips_sf <- st_set_crs(bike_trips_sf, 4326)
+ 
+ 
+ # Filter the trip data to include only trips that start or end within Manhattan
+ bike_trips_manhattan <- st_intersection(bike_trips_sf, Manhattan_shape)
+ 
+ 
+# Calculate the mean trip duration for each start station 
+ start_station_mean_duration <- bike_trips_manhattan %>%
+   group_by(start_station_id) %>%
+   summarise(mean_duration = mean(trip_duration), .groups = 'drop')
+ 
+ # Create a map of start stations within Manhattan
+ start_station_mean_duration_manhattan_map <- tm_shape(Manhattan_shape) +
+   tm_borders(lwd = 1, col = "black") +
+   tm_shape(start_station_mean_duration) +
+   tm_bubbles(size = 0.05, col = 'mean_duration',palette = "YlGnBu", border.col = 'black') +
+   tm_layout(title = 'Mean Trip Duration by Start Station in Manhattan') +
+   tm_basemap(server = "OpenStreetMap", alpha = 0.5)
+ 
+ start_station_mean_duration_manhattan_map 
+ 
+ tmap_save(tm = start_station_mean_duration_manhattan_map,
+         filename ="../output/start_station_mean_duration_manhattan_map.png")
+```
+
+
+
+```{r}
+# Load a shape file of New York City
+ nyc_shape <- st_read('../data/BoroughBoundaries.geojson')
+ 
+ # Filter the shape file to only include Manhattan
+ Manhattan_shape <- nyc_shape %>%
+   filter(boro_name == 'Manhattan')
+ 
+ bike_trips_sf <- st_set_crs(bike_trips_sf, 4326)
+ 
+ 
+ # Filter the trip data to include only trips that start or end within Manhattan
+ bike_trips_manhattan <- st_intersection(bike_trips_sf, Manhattan_shape)
+ 
+ 
+# Calculate the mean trip duration for each end station 
+ end_station_mean_duration <- bike_trips_manhattan %>%
+   group_by(end_station_id) %>%
+   summarise(mean_duration = mean(trip_duration), .groups = 'drop')
+ 
+ # Create a map of end stations within Manhattan
+ end_station_mean_duration_manhattan_map <- tm_shape(Manhattan_shape) +
+   tm_borders(lwd = 1, col = "black") +
+   tm_shape(end_station_mean_duration) +
+   tm_bubbles(size = 0.05, col = 'mean_duration',palette = "YlGnBu", border.col = 'black') +
+   tm_layout(title = 'Mean Trip Duration by End Station in Manhattan') +
+   tm_basemap(server = "OpenStreetMap", alpha = 0.5)
+ 
+ end_station_mean_duration_manhattan_map 
+ 
+ tmap_save(tm = end_station_mean_duration_manhattan_map,
+         filename ="../output/end_station_mean_duration_manhattan_map.png")
+```
+
+
+
+
+
+```{r}
+
+```
