@@ -14,10 +14,10 @@ output:
 #import libraries
 
 library(tidyverse)
-library(lubridate)#'lubridate' package is used for working with dates and times in R
+library(lubridate) 
 library(skimr)
-library(tmap)#'tmap' package for creating thematic maps in R
-library(sf)#'sf'(simple features) package is used for working with geospatial data in R
+library(tmap)
+library(sf)
 
 ```
 
