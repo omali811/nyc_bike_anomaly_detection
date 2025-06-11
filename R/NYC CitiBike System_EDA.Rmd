@@ -333,14 +333,6 @@ weekend_plot
 
 ```
 
-The weekdays plot provides insight into the distribution of the number of trips by hour on weekdays (Monday to Friday). Each bar on the x-axis represents a specific hour of the day, while the y-axis represents the count of trips recorded during each hour. By examining the heights of the bars, we can observe that the hours 8 AM, 3 PM, 4 PM, 5 PM, and 6 PM have the highest number of trips, indicating that these hours are the peak hours for weekday travel.
-
-On the other hand, the weekends plot illustrates the distribution of the number of trips by hour on weekends (Saturday and Sunday). It follows a similar structure to the weekdays plot.By analyzing this plot, we can identify the hours 12 PM, 1 PM, 2 PM, 3 PM, 4 PM, and 5 PM as the peak hours for weekend travel.
-
-Furthermore, we can observe that the count of trips during weekdays generally falls within the range of 0 to 700, whereas the count of trips during weekends tends to be lower, typically ranging from 0 to 225. This indicates that there are more trips recorded on weekdays compared to weekends.
-
-
-
 ```{r}
 # Create box plots for the distribution of trips by hour, separated by weekdays and weekends
 
@@ -861,28 +853,6 @@ destinations_Sunday <- destinations_Sunday %>%
 
 destinations_Sunday
 ```
-
-
-
-
-For station 5905.14, the most common destination is also 5905.14, with 118 trips.
-
-No trips start from station 5905.14 at hours 3, 4, 5, 6. At hours 0, 1, 7, 10, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, the most common destination is also 5905.14. At hours 2, 11, and 20, the most common destination is 5980.07. At hour 8, the most common destination is 6441.01 with 4 trips. At hour 9, the most common destination is 5500.02 with 1 trip. Therefore, for station 5905.14, the most common destination changes with the hour of the day.
-
-The most common destination does not change for station 5905.14 with user type. Both member and casual users’ most common destination is also 5905.14.
-
-On all days, the most common destination for station 5905.14 is also 5905.14.
-
-
-```{r}
-
-```
-
-
-
-
-
-
 
 ```{r}
 tmap_mode("view")
